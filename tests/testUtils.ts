@@ -2,20 +2,32 @@ import type { SelectorEngine } from '../src/node/main'
 import { type Page, selectors } from '@playwright/test'
 import { throwIfUndefined } from 'throw-expression'
 
-type SelectorEngineName = 'css' | 'xpath'
+type SelectorEngineName = 'css' | 'webgui' | 'xpath'
+type SelectorEngineId = 'ui5_css' | 'webgui' | 'ui5_xpath'
+
+const selectorEngineIdByName: Record<SelectorEngineName, SelectorEngineId> = {
+    css: 'ui5_css',
+    webgui: 'webgui',
+    xpath: 'ui5_xpath',
+}
 
 export class Ui5Tester {
-    selectorEngineId: `ui5_${SelectorEngineName}`
+    selectorEngineId: SelectorEngineId
 
     constructor(private selectorEngineName: SelectorEngineName) {
-        this.selectorEngineId = `ui5_${selectorEngineName}`
+        this.selectorEngineId = selectorEngineIdByName[this.selectorEngineName]
     }
     navigateToUi5DocsPage = async (page: Page, path: `/${string}`) => {
+        if (this.selectorEngineName === 'webgui') {
+            throw new Error('navigateToUi5DocsPage cannot be used with the webgui selector engine')
+        }
         await page.goto(`https://ui5.sap.com/1.127.7${path}`)
+        const selectorByEngine = {
+            css: '*',
+            xpath: '//*',
+        } as const
         await page.waitForSelector(
-            `${this.selectorEngineId}=${
-                this.selectorEngineName === 'css' ? '*' : '//*'
-            } >> visible=true`,
+            `${this.selectorEngineId}=${selectorByEngine[this.selectorEngineName]} >> visible=true`,
         )
     }
 

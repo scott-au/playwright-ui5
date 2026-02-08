@@ -141,3 +141,107 @@ playwright-ui5 debug-xml function was called. here is the XML element tree:
     <!-- ... -->
 </sap-ui-area>
 ```
+
+### webgui selector engine
+
+```ts
+import { selectors, test } from '@playwright/test'
+import { webgui } from 'playwright-ui5'
+
+test.beforeAll(async () => {
+    await selectors.register('webgui', webgui)
+})
+
+test('webgui example', async ({ page }) => {
+    await page.goto('file:///path/to/webgui-page.html')
+    await page.fill("webgui=textbox[label='Breed search']", 'Labrador Retriever')
+    await page.fill("webgui=textbox[group='Ranking'][part='from']", '1')
+    await page.fill("webgui=textbox[group='Ranking'][part='to']", '10')
+})
+```
+
+#### syntax
+
+the webgui selector engine focuses on user-facing selectors and table fallbacks:
+
+-   css-like syntax: `webgui=<type>[key='value'][key='value']...`
+-   supported types: `textbox`, `button`, `checkbox`, `radio`, `combobox`, `listbox`, `option`, `spinbutton`, `table`, `link`, `*`
+-   supported keys:
+    -   `label`: matches controls by visible label text
+    -   `group`: matches range groups (for example `Ranking` + `to`)
+    -   `part=from|to`: selects one side of a range group
+    -   `table`, `row`, `column`: fallback for unlabeled table controls
+    -   `id`: final fallback when no visible label exists
+    -   `title` and `role`: optional extra filters
+    -   `value` and `checked=true|false`: value/state filters for lists, radios, checkboxes, and inputs
+    -   `index=<n>`: 1-based index when multiple elements match
+
+#### table iteration example
+
+```ts
+test('webgui table workflow', async ({ page }) => {
+    await page.goto('file:///path/to/webgui-page.html')
+
+    const dogBreedsTable = {
+        columnInputs: (column: string) =>
+            page.locator(`webgui=textbox[table='Most Popular Dog Breeds'][column='${column}']`),
+    }
+
+    const breedColumn = dogBreedsTable.columnInputs('Breed')
+    const originColumn = dogBreedsTable.columnInputs('Origin')
+    const popularityColumn = dogBreedsTable.columnInputs('Popularity Score')
+    const featuredBreeds = [
+        'Labrador Retriever',
+        'French Bulldog',
+        'Golden Retriever',
+        'German Shepherd',
+        'Poodle',
+    ]
+
+    // row count is discovered at runtime (unknown number of rows)
+    const rowCount = await breedColumn.count()
+
+    for (let rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+        const rowNumber = rowIndex + 1
+        await breedColumn.nth(rowIndex).fill(featuredBreeds[rowIndex] ?? `Breed ${rowNumber}`)
+        await originColumn.nth(rowIndex).fill(`Region ${rowNumber}`)
+        await popularityColumn.nth(rowIndex).fill(String(100 - rowIndex))
+    }
+})
+```
+
+## chrome extension picker (experimental)
+
+this repo now includes a standalone chrome extension picker at `chrome-extension/` that does not depend on playwright runtime.
+
+### load extension
+
+1. open `chrome://extensions`
+2. enable **developer mode**
+3. click **load unpacked**
+4. select the `playwright-ui5/chrome-extension` folder
+
+### use extension
+
+1. click the extension icon and press **start picker**
+2. hover elements to inspect targets
+3. click an element to capture selector candidates
+4. copy a candidate from the popup
+
+### pinned panel (always visible)
+
+if you want the picker UI to stay visible while you work:
+
+1. open the extension popup
+2. click **open pinned panel**
+3. chrome opens the extension in the side panel, which stays pinned and updates as you pick
+
+the picker generates:
+
+-   `webgui=...` selectors for sap webgui pages (label, range group, table fallback, id fallback)
+-   `ui5_css=...` / `ui5_xpath=...` selectors for sapui5 pages
+-   dom fallback selectors on non-sap pages
+
+### shortcut
+
+-   `Alt+Shift+P` toggles picker on the active tab

@@ -14,6 +14,7 @@ const selectorEngine = (fileName: string): SelectorEngine => ({
 })
 
 export const css = selectorEngine('css')
+export const webgui = selectorEngine('webgui')
 export const xpath = selectorEngine('xpath')
 
 /** @deprecated the default import is deprecated. explicitly import either the css or xpath selector engine instead */
