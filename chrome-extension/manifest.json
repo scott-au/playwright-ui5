@@ -1,0 +1,34 @@
+{
+    "manifest_version": 3,
+    "name": "SAP Selector Picker",
+    "version": "0.1.0",
+    "description": "Picks SAP UI5 and SAP WebGUI selectors from live pages.",
+    "permissions": ["activeTab", "scripting", "sidePanel", "storage", "tabs"],
+    "host_permissions": ["<all_urls>"],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "action": {
+        "default_title": "SAP Selector Picker",
+        "default_popup": "popup.html"
+    },
+    "side_panel": {
+        "default_path": "sidepanel.html"
+    },
+    "commands": {
+        "toggle-picker": {
+            "suggested_key": {
+                "default": "Alt+Shift+P"
+            },
+            "description": "Toggle SAP selector picker"
+        }
+    },
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["content.js"],
+            "run_at": "document_idle",
+            "all_frames": true
+        }
+    ]
+}

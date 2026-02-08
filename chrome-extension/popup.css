@@ -1,0 +1,150 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    color: #0f172a;
+    background: #f8fafc;
+}
+
+.popup {
+    width: 420px;
+    max-height: 640px;
+    padding: 12px;
+    overflow: auto;
+}
+
+body.sidepanel .popup {
+    width: auto;
+    max-height: none;
+    min-height: 100vh;
+}
+
+h1 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+}
+
+h2 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+}
+
+button {
+    cursor: pointer;
+}
+
+#togglePickerButton {
+    width: 100%;
+    height: 34px;
+    border: 1px solid #0a84ff;
+    border-radius: 6px;
+    color: #fff;
+    background: #0a84ff;
+}
+
+#togglePickerButton:hover {
+    background: #006de0;
+}
+
+.actions {
+    display: grid;
+    gap: 8px;
+}
+
+.secondaryButton {
+    width: 100%;
+    height: 32px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    color: #0f172a;
+    background: #fff;
+}
+
+.secondaryButton:hover {
+    background: #f1f5f9;
+}
+
+.status {
+    margin: 10px 0 0 0;
+    font-size: 12px;
+}
+
+.result {
+    margin-top: 12px;
+    border-top: 1px solid #dbe4f0;
+    padding-top: 10px;
+}
+
+.hidden {
+    display: none;
+}
+
+.meta {
+    margin: 0 0 10px 0;
+    color: #334155;
+    font-size: 12px;
+}
+
+.groups {
+    display: grid;
+    gap: 10px;
+}
+
+.group {
+    padding: 8px;
+    border: 1px solid #dbe4f0;
+    border-radius: 6px;
+    background: #fff;
+}
+
+.groupTitle {
+    margin: 0 0 8px 0;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.selectorRow {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    margin-top: 6px;
+    align-items: start;
+}
+
+.selectorContent {
+    display: grid;
+    gap: 4px;
+}
+
+.selectorLabel {
+    margin: 0;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.selectorText {
+    display: block;
+    overflow-wrap: anywhere;
+    color: #0f172a;
+    font-family: Consolas, Menlo, Monaco, monospace;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.copyButton {
+    min-width: 58px;
+    height: 24px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 11px;
+}
+
+.copyButton:hover {
+    background: #edf2f7;
+}

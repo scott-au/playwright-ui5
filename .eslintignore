@@ -1,4 +1,5 @@
 playwright-report/
+chrome-extension/
 
 # prevent eslint from ignoring other config files
 !.*.js

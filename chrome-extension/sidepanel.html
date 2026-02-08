@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>SAP Selector Picker</title>
+        <link rel="stylesheet" href="popup.css" />
+    </head>
+    <body class="sidepanel">
+        <main class="popup">
+            <h1>SAP Selector Picker</h1>
+            <div class="actions">
+                <button id="togglePickerButton" type="button">Toggle picker</button>
+            </div>
+            <p id="pickerStatus" class="status">Loading state...</p>
+            <section id="resultSection" class="result hidden">
+                <h2>Last Pick</h2>
+                <p id="resultMeta" class="meta"></p>
+                <div id="resultGroups" class="groups"></div>
+            </section>
+        </main>
+        <script src="popup.js"></script>
+    </body>
+</html>
