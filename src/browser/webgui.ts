@@ -3,15 +3,27 @@ import { Ui5SelectorEngineError } from './common'
 
 type RangePart = 'from' | 'to'
 type WebGuiControlType =
+    | 'abaplist'
+    | 'abaplistelement'
+    | 'box'
     | 'button'
+    | 'cell'
     | 'checkbox'
+    | 'column'
     | 'combobox'
+    | 'expandablesection'
     | 'link'
     | 'listbox'
+    | 'messagearea'
+    | 'messagebar'
+    | 'modalwindow'
     | 'option'
     | 'radio'
     | 'spinbutton'
     | 'table'
+    | 'tab'
+    | 'tabstrip'
+    | 'text'
     | 'textbox'
 
 interface SelectorCriteria {
@@ -19,8 +31,10 @@ interface SelectorCriteria {
     label?: string
     group?: string
     table?: string
+    tab?: string
     row?: string
     column?: string
+    cell?: string
     id?: string
     title?: string
     role?: string
@@ -42,15 +56,20 @@ interface ElementMetadata {
     id: string | undefined
     ct: string | undefined
     role: string | undefined
+    controlTypes: Set<WebGuiControlType>
     value: string | undefined
+    tableColumnHeaders: string[]
+    tableCellValues: string[]
     checked: boolean | undefined
     title: string | undefined
     ariaLabel: string | undefined
     directLabel: string | undefined
+    labelCandidates: string[]
     tableContext: TableContext
     rowKey: string | undefined
     rangePart: RangePart | undefined
     groupLabel: string | undefined
+    tabLabels: string[]
     displayLabel: string
 }
 
@@ -60,29 +79,45 @@ interface TableCoordinates {
     column: number
 }
 
-const interactiveControlTypes = new Set([
-    'B',
-    'CB',
-    'CBS',
-    'CI',
-    'IMG',
-    'LN',
-    'LNC',
-    'R',
-    'RLI',
-    'R_standards',
-    'TV',
-])
-
-const interactiveRoles = new Set([
-    'button',
-    'checkbox',
-    'combobox',
-    'listbox',
-    'option',
-    'radio',
-    'spinbutton',
-    'textbox',
+const abapListControlTypes = new Set(['AL'])
+const abapListElementControlTypes = new Set(['ALC', 'ALI', 'ALT'])
+const boxControlTypes = new Set(['G'])
+const buttonControlTypes = new Set(['B', 'IB', 'IMG'])
+const cellControlTypes = new Set(['HIC', 'SC', 'STC'])
+const checkboxControlTypes = new Set(['C_standards'])
+const columnControlTypes = new Set(['HC'])
+const comboboxControlTypes = new Set(['CB'])
+const expandableSectionControlTypes = new Set(['P'])
+const linkControlTypes = new Set(['LN', 'LNC'])
+const messageAreaControlTypes = new Set(['MA'])
+const messageBarControlTypes = new Set(['MB'])
+const modalWindowControlTypes = new Set(['PW', 'PW_standards'])
+const menuItemControlTypes = new Set(['POMN', 'POMNI'])
+const radioControlTypes = new Set(['R', 'RLI', 'R_standards'])
+const tabStripControlTypes = new Set(['HCNP_standards', 'TS_standards'])
+const tableControlTypes = new Set(['G', 'ST', 'STCS'])
+const textControlTypes = new Set(['ALI', 'ALT', 'DTF', 'L', 'TV'])
+const textboxControlTypes = new Set(['CBS', 'CI', 'I', 'TE'])
+const candidateControlTypes = new Set([
+    ...abapListControlTypes,
+    ...abapListElementControlTypes,
+    ...boxControlTypes,
+    ...buttonControlTypes,
+    ...cellControlTypes,
+    ...checkboxControlTypes,
+    ...columnControlTypes,
+    ...comboboxControlTypes,
+    ...expandableSectionControlTypes,
+    ...linkControlTypes,
+    ...messageAreaControlTypes,
+    ...messageBarControlTypes,
+    ...menuItemControlTypes,
+    ...modalWindowControlTypes,
+    ...radioControlTypes,
+    ...tabStripControlTypes,
+    ...tableControlTypes,
+    ...textControlTypes,
+    ...textboxControlTypes,
 ])
 
 const normalizeText = (value: string | null | undefined) =>
@@ -91,6 +126,7 @@ const normalizeText = (value: string | null | undefined) =>
 const normalizeForMatch = (value: string | null | undefined) => normalizeText(value).toLowerCase()
 
 const supportedSelectorKeys = new Set([
+    'cell',
     'checked',
     'column',
     'group',
@@ -100,13 +136,14 @@ const supportedSelectorKeys = new Set([
     'part',
     'role',
     'row',
+    'tab',
     'table',
     'title',
     'value',
 ])
 const supportedSelectorKeysMessage = [...supportedSelectorKeys].join(', ')
 
-const supportedControlTypes = new Set([
+const roleControlTypes = new Set([
     'button',
     'checkbox',
     'combobox',
@@ -116,9 +153,51 @@ const supportedControlTypes = new Set([
     'radio',
     'spinbutton',
     'table',
+    'tab',
     'textbox',
 ])
-const supportedControlTypesMessage = [...supportedControlTypes].join(', ')
+const supportedControlTypeAliases: Record<string, WebGuiControlType | undefined> = {
+    '*': undefined,
+    abaplist: 'abaplist',
+    abaplisttable: 'abaplist',
+    abaplisttree: 'abaplist',
+    abaplistelement: 'abaplistelement',
+    box: 'box',
+    button: 'button',
+    cell: 'cell',
+    checkbox: 'checkbox',
+    column: 'column',
+    combobox: 'combobox',
+    daterangefields: 'textbox',
+    datefield: 'textbox',
+    dropdownbutton: 'button',
+    dropdownfield: 'combobox',
+    expandablesection: 'expandablesection',
+    link: 'link',
+    listbox: 'listbox',
+    messagearea: 'messagearea',
+    messagebar: 'messagebar',
+    modal: 'modalwindow',
+    modalwindow: 'modalwindow',
+    option: 'option',
+    radio: 'radio',
+    radiogroup: 'radio',
+    rangefields: 'textbox',
+    section: 'expandablesection',
+    spinbutton: 'spinbutton',
+    statictext: 'text',
+    table: 'table',
+    tab: 'tab',
+    tabstrip: 'tabstrip',
+    textrangefields: 'textbox',
+    text: 'text',
+    textfield: 'textbox',
+    textbox: 'textbox',
+    numberrangefields: 'textbox',
+    tree: 'table',
+    webguielement: undefined,
+}
+const supportedControlTypesMessage = Object.keys(supportedControlTypeAliases).sort().join(', ')
 
 const unquote = (value: string) => {
     if (
@@ -250,14 +329,13 @@ const parseSelectorValue = (key: string, value: string) => {
 
 const parseControlType = (value: string): WebGuiControlType | undefined => {
     const normalizedValue = normalizeForMatch(value)
-    if (normalizedValue === '*') {
-        return undefined
-    }
-    if (supportedControlTypes.has(normalizedValue)) {
-        return normalizedValue as WebGuiControlType
+    if (
+        Object.prototype.hasOwnProperty.call(supportedControlTypeAliases, normalizedValue)
+    ) {
+        return supportedControlTypeAliases[normalizedValue]
     }
     throw new Error(
-        `unsupported webgui control type "${value}". supported control types: *, ${supportedControlTypesMessage}`,
+        `unsupported webgui control type "${value}". supported control types: ${supportedControlTypesMessage}`,
     )
 }
 
@@ -294,12 +372,14 @@ const applySelectorCriterion = (criteria: SelectorCriteria, key: string, value: 
     }
 
     if (
+        key === 'cell' ||
         key === 'column' ||
         key === 'group' ||
         key === 'id' ||
         key === 'label' ||
         key === 'role' ||
         key === 'row' ||
+        key === 'tab' ||
         key === 'table' ||
         key === 'title' ||
         key === 'value'
@@ -410,43 +490,158 @@ const isWebGui = (root: Element | Document) => {
     return document.querySelector('[ct="PAGE"]') !== null
 }
 
+const inferControlTypes = (
+    element: Element,
+    ct: string | undefined,
+    role: string | undefined,
+): Set<WebGuiControlType> => {
+    const controlTypes = new Set<WebGuiControlType>()
+    const normalizedRole = normalizeForMatch(role)
+    if (roleControlTypes.has(normalizedRole)) {
+        controlTypes.add(normalizedRole as WebGuiControlType)
+    }
+    if (normalizedRole === 'columnheader') {
+        controlTypes.add('column')
+    }
+    if (normalizedRole === 'cell' || normalizedRole === 'gridcell') {
+        controlTypes.add('cell')
+    }
+    if (normalizedRole === 'dialog') {
+        controlTypes.add('modalwindow')
+    }
+    if (normalizedRole === 'tablist') {
+        controlTypes.add('tabstrip')
+    }
+    if (normalizedRole === 'status') {
+        controlTypes.add('messagebar')
+    }
+    if (normalizedRole === 'menuitem' || normalizedRole === 'menuitemradio') {
+        controlTypes.add('option')
+    }
+
+    if (ct !== undefined) {
+        if (abapListControlTypes.has(ct)) {
+            controlTypes.add('abaplist')
+        }
+        if (abapListElementControlTypes.has(ct)) {
+            controlTypes.add('abaplistelement')
+        }
+        if (boxControlTypes.has(ct)) {
+            controlTypes.add('box')
+        }
+        if (buttonControlTypes.has(ct)) {
+            controlTypes.add('button')
+        }
+        if (cellControlTypes.has(ct)) {
+            controlTypes.add('cell')
+        }
+        if (checkboxControlTypes.has(ct)) {
+            controlTypes.add('checkbox')
+        }
+        if (columnControlTypes.has(ct)) {
+            controlTypes.add('column')
+        }
+        if (comboboxControlTypes.has(ct)) {
+            controlTypes.add('combobox')
+        }
+        if (expandableSectionControlTypes.has(ct)) {
+            controlTypes.add('expandablesection')
+        }
+        if (linkControlTypes.has(ct)) {
+            controlTypes.add('link')
+        }
+        if (messageAreaControlTypes.has(ct)) {
+            controlTypes.add('messagearea')
+        }
+        if (messageBarControlTypes.has(ct)) {
+            controlTypes.add('messagebar')
+        }
+        if (menuItemControlTypes.has(ct)) {
+            controlTypes.add('option')
+        }
+        if (modalWindowControlTypes.has(ct)) {
+            controlTypes.add('modalwindow')
+        }
+        if (radioControlTypes.has(ct)) {
+            controlTypes.add('radio')
+        }
+        if (tabStripControlTypes.has(ct)) {
+            controlTypes.add('tabstrip')
+        }
+        if (tableControlTypes.has(ct)) {
+            controlTypes.add('table')
+        }
+        if (textControlTypes.has(ct)) {
+            controlTypes.add('text')
+        }
+        if (textboxControlTypes.has(ct)) {
+            controlTypes.add('textbox')
+        }
+    }
+
+    if (element instanceof HTMLButtonElement) {
+        controlTypes.add('button')
+    }
+    if (element instanceof HTMLTextAreaElement) {
+        controlTypes.add('textbox')
+    }
+    if (element instanceof HTMLSelectElement) {
+        if (element.multiple || element.size > 1) {
+            controlTypes.add('listbox')
+        } else {
+            controlTypes.add('combobox')
+        }
+    }
+    if (element instanceof HTMLOptionElement) {
+        controlTypes.add('option')
+    }
+    if (element instanceof HTMLInputElement) {
+        const normalizedType = normalizeForMatch(element.type)
+        if (normalizedType === 'checkbox') {
+            controlTypes.add('checkbox')
+        } else if (normalizedType === 'radio') {
+            controlTypes.add('radio')
+        } else if (normalizedType === 'number') {
+            controlTypes.add('spinbutton')
+        } else if (
+            normalizedType === 'button' ||
+            normalizedType === 'image' ||
+            normalizedType === 'reset' ||
+            normalizedType === 'submit'
+        ) {
+            controlTypes.add('button')
+        } else if (normalizedType !== 'hidden') {
+            controlTypes.add('textbox')
+        }
+    }
+    if (element instanceof HTMLAnchorElement) {
+        controlTypes.add('link')
+    }
+    if (element instanceof HTMLTableElement && hasOwnGridEntries(element)) {
+        controlTypes.add('table')
+    }
+    if (normalizedRole === 'table' || normalizedRole === 'grid') {
+        controlTypes.add('table')
+    }
+
+    return controlTypes
+}
+
 const isCandidateElement = (element: Element) => {
-    const ct = element.getAttribute('ct')
-    if (ct !== null && interactiveControlTypes.has(ct)) {
+    const ct = element.getAttribute('ct') ?? element.getAttribute('subct')
+    if (ct !== null && candidateControlTypes.has(ct)) {
         return true
     }
 
     const role = element.getAttribute('role')
-    if (role !== null && interactiveRoles.has(role)) {
+    if (inferControlTypes(element, ct ?? undefined, role ?? undefined).size > 0) {
         return true
     }
 
-    const tagName = element.tagName
-    if (tagName === 'INPUT') {
-        return (element as HTMLInputElement).type !== 'hidden'
-    }
-    if (tagName === 'TEXTAREA' || tagName === 'SELECT' || tagName === 'BUTTON') {
-        return true
-    }
-    if (tagName === 'A') {
-        return (
-            role === 'button' ||
-            element.getAttribute('tabindex') === '0' ||
-            element.getAttribute('ti') === '0'
-        )
-    }
-    if (tagName === 'TABLE') {
-        return true
-    }
-    if (ct === 'G' || ct === 'STCS') {
-        return true
-    }
-    if (role === 'group') {
+    if (normalizeForMatch(role) === 'group') {
         return element.querySelector('table') !== null
     }
-    if (role === 'table' || role === 'grid') {
-        return true
-    }
+
     return false
 }
 
@@ -462,19 +657,193 @@ const queryElementsInScope = (root: Element | Document, selector: string): Eleme
 const getCandidateElements = (root: Element | Document) =>
     queryElementsInScope(
         root,
-        '[ct],a,button,input,[role="button"],[role="checkbox"],[role="combobox"],[role="grid"],[role="group"],[role="listbox"],[role="option"],[role="radio"],[role="spinbutton"],[role="table"],[role="textbox"],select,table,textarea',
+        '[ct],[subct],a,button,input,option,[role="button"],[role="cell"],[role="checkbox"],[role="columnheader"],[role="combobox"],[role="dialog"],[role="grid"],[role="gridcell"],[role="group"],[role="link"],[role="listbox"],[role="menuitem"],[role="menuitemradio"],[role="option"],[role="radio"],[role="spinbutton"],[role="status"],[role="table"],[role="tab"],[role="tablist"],[role="textbox"],select,table,textarea',
     ).filter(isCandidateElement)
+
+const normalizeLabelText = (value: string | null | undefined) => {
+    const normalized = normalizeText(value).replace(/\u00a0/gu, ' ')
+    if (normalized === '') {
+        return ''
+    }
+    return normalized.replace(/\s*:\s*$/u, '').trim()
+}
+
+const toCompactLabel = (value: string | null | undefined, maximumLength = 120) => {
+    const normalized = normalizeLabelText(value)
+    if (normalized === '' || normalized.length > maximumLength) {
+        return undefined
+    }
+    return normalized
+}
+
+const appendLabelCandidate = (
+    labels: string[],
+    seenLabels: Set<string>,
+    value: string | undefined,
+    maximumLength = 120,
+) => {
+    const normalized = toCompactLabel(value, maximumLength)
+    if (normalized === undefined) {
+        return
+    }
+    const key = normalizeForMatch(normalized)
+    if (seenLabels.has(key)) {
+        return
+    }
+    seenLabels.add(key)
+    labels.push(normalized)
+}
 
 const getLabelTextsForId = (document: Document, id: string) =>
     Array.from(document.querySelectorAll(`label[for="${CSS.escape(id)}"]`))
-        .map((label) => normalizeText(label.textContent))
+        .map((label) => normalizeLabelText(label.textContent))
         .filter((labelText) => labelText !== '')
 
-const getPrimaryLabelForElement = (document: Document, id: string | undefined) => {
-    if (id === undefined) {
+const getButtonTitleLabel = (title: string | undefined) => {
+    if (title === undefined) {
         return undefined
     }
-    return getLabelTextsForId(document, id)[0]
+    const withoutShortcut = title.replace(/\s+\([^)]*\)\s*$/u, '')
+    const normalized = normalizeLabelText(withoutShortcut)
+    return normalized === '' ? undefined : normalized
+}
+
+const getElementTextLabel = (element: Element, maximumLength = 120) => {
+    const candidateSelectors = ['label', '[ct="CP"]', 'span']
+    for (const selector of candidateSelectors) {
+        const candidate = element.querySelector(selector)
+        if (candidate === null) {
+            continue
+        }
+        const text = toCompactLabel(candidate.textContent, maximumLength)
+        if (text !== undefined) {
+            return text
+        }
+    }
+    return toCompactLabel(element.textContent, maximumLength)
+}
+
+const getModalWindowLabel = (element: Element) => {
+    const modalTitleSelectors = ['.urPWTitleText', '[role="heading"]', '[id$="-title"]']
+    for (const selector of modalTitleSelectors) {
+        const titleElement = element.querySelector(selector)
+        if (titleElement === null) {
+            continue
+        }
+        const titleText = toCompactLabel(titleElement.textContent, 160)
+        if (titleText !== undefined) {
+            return titleText
+        }
+    }
+    return undefined
+}
+
+const getExpandableSectionLabel = (document: Document, element: Element) => {
+    const labelledElement =
+        element.querySelector('[aria-label]') ??
+        element.querySelector('[aria-labelledby]') ??
+        element.querySelector('[title]') ??
+        element.querySelector('[role="heading"]')
+    if (labelledElement !== null) {
+        const attributedLabel = getElementLabelFromAttributes(document, labelledElement)
+        if (attributedLabel !== undefined) {
+            return attributedLabel
+        }
+        const textLabel = toCompactLabel(labelledElement.textContent, 160)
+        if (textLabel !== undefined) {
+            return textLabel
+        }
+    }
+    return undefined
+}
+
+const getTabStripLabels = (tabStripElement: Element) => {
+    const tabLabels: string[] = []
+    const seenLabels = new Set<string>()
+    const tabSelectors = ['[action="TAB_ACCESS"]', '[ct="HCNPI_standards"]', '[role="tab"]']
+    for (const selector of tabSelectors) {
+        tabStripElement.querySelectorAll(selector).forEach((tabElement) =>
+            appendLabelCandidate(tabLabels, seenLabels, tabElement.textContent ?? undefined, 160),
+        )
+    }
+    return tabLabels
+}
+
+const getLabelFromStructuralSiblings = (document: Document, element: Element) => {
+    let currentElement: Element | null = element
+    for (let depth = 0; depth < 5 && currentElement !== null; depth++) {
+        let sibling: Element | null = currentElement.previousElementSibling
+        while (sibling !== null) {
+            const siblingLabel = getLabelFromSibling(document, sibling)
+            if (siblingLabel !== undefined) {
+                return siblingLabel
+            }
+            sibling = sibling.previousElementSibling
+        }
+        currentElement = currentElement.parentElement
+    }
+    return undefined
+}
+
+const getLabelCandidatesForElement = (
+    document: Document,
+    element: Element,
+    controlTypes: Set<WebGuiControlType>,
+    title: string | undefined,
+) => {
+    const labels: string[] = []
+    const seenLabels = new Set<string>()
+    const id = normalizeText(element.id)
+    if (id !== '') {
+        getLabelTextsForId(document, id).forEach((labelText) =>
+            appendLabelCandidate(labels, seenLabels, labelText),
+        )
+    }
+
+    if (
+        controlTypes.has('textbox') ||
+        controlTypes.has('combobox') ||
+        controlTypes.has('listbox') ||
+        controlTypes.has('spinbutton')
+    ) {
+        appendLabelCandidate(labels, seenLabels, getLabelFromStructuralSiblings(document, element))
+    }
+
+    if (
+        controlTypes.has('button') ||
+        controlTypes.has('checkbox') ||
+        controlTypes.has('link') ||
+        controlTypes.has('option') ||
+        controlTypes.has('radio') ||
+        controlTypes.has('tab') ||
+        controlTypes.has('abaplistelement') ||
+        controlTypes.has('box') ||
+        controlTypes.has('cell') ||
+        controlTypes.has('column') ||
+        controlTypes.has('text')
+    ) {
+        appendLabelCandidate(labels, seenLabels, getElementTextLabel(element, 160), 160)
+    }
+    if (controlTypes.has('button')) {
+        appendLabelCandidate(labels, seenLabels, getButtonTitleLabel(title))
+    }
+    if (controlTypes.has('expandablesection')) {
+        appendLabelCandidate(labels, seenLabels, getExpandableSectionLabel(document, element), 160)
+    }
+    if (controlTypes.has('modalwindow')) {
+        appendLabelCandidate(labels, seenLabels, getModalWindowLabel(element), 160)
+    }
+    if (controlTypes.has('tabstrip')) {
+        getTabStripLabels(element).forEach((tabLabel) =>
+            appendLabelCandidate(labels, seenLabels, tabLabel, 160),
+        )
+    }
+    if (controlTypes.has('table')) {
+        appendLabelCandidate(labels, seenLabels, getOwnTableLabel(document, element), 160)
+    }
+    appendLabelCandidate(labels, seenLabels, getElementLabelFromAttributes(document, element), 160)
+
+    return labels
 }
 
 const getElementValue = (element: Element) => {
@@ -495,7 +864,17 @@ const getElementValue = (element: Element) => {
     }
 
     const ariaValueText = normalizeText(element.getAttribute('aria-valuetext'))
-    return ariaValueText === '' ? undefined : ariaValueText
+    if (ariaValueText !== '') {
+        return ariaValueText
+    }
+
+    if (element.tagName !== 'TABLE') {
+        const textContent = toCompactLabel(element.textContent, 160)
+        if (textContent !== undefined) {
+            return textContent
+        }
+    }
+    return undefined
 }
 
 const getElementCheckedState = (element: Element) => {
@@ -529,6 +908,53 @@ const getGridCoordinatesFromId = (id: string): TableCoordinates | undefined => {
         }
     }
 
+    const treeHeaderPatternMatch = id.match(
+        /^(?<tableId>tree#.+?)#HierarchyHeader#(?<column>\d+)#header(?:$|[#-])/u,
+    )
+    if (treeHeaderPatternMatch?.groups !== undefined) {
+        const tableId = treeHeaderPatternMatch.groups['tableId']
+        const column = treeHeaderPatternMatch.groups['column']
+        if (tableId === undefined || column === undefined) {
+            return undefined
+        }
+        return {
+            tableId,
+            row: 0,
+            column: Number.parseInt(column, 10),
+        }
+    }
+
+    const treeNamedHeaderPatternMatch = id.match(
+        /^(?<tableId>tree#.+?)#[^#]+#(?<column>\d+)#header(?:$|[#-])/u,
+    )
+    if (treeNamedHeaderPatternMatch?.groups !== undefined) {
+        const tableId = treeNamedHeaderPatternMatch.groups['tableId']
+        const column = treeNamedHeaderPatternMatch.groups['column']
+        if (tableId === undefined || column === undefined) {
+            return undefined
+        }
+        return {
+            tableId,
+            row: 0,
+            column: Number.parseInt(column, 10),
+        }
+    }
+
+    const treeCellPatternMatch = id.match(/^(?<tableId>tree#.+?)#(?<row>\d+)#(?<column>\d+)(?:$|#)/u)
+    if (treeCellPatternMatch?.groups !== undefined) {
+        const tableId = treeCellPatternMatch.groups['tableId']
+        const row = treeCellPatternMatch.groups['row']
+        const column = treeCellPatternMatch.groups['column']
+        if (tableId === undefined || row === undefined || column === undefined) {
+            return undefined
+        }
+        return {
+            tableId,
+            row: Number.parseInt(row, 10),
+            column: Number.parseInt(column, 10),
+        }
+    }
+
     const hashPatternMatch = id.match(/^(?<tableId>.+?)#(?<row>\d+),(?<column>\d+)(?:#|$)/u)
     if (hashPatternMatch?.groups !== undefined) {
         const tableId = hashPatternMatch.groups['tableId']
@@ -545,6 +971,18 @@ const getGridCoordinatesFromId = (id: string): TableCoordinates | undefined => {
     }
 
     return undefined
+}
+
+const hasOwnGridEntries = (tableElement: HTMLTableElement) => {
+    const tableId = normalizeText(tableElement.id)
+    if (tableId === '') {
+        return false
+    }
+    const tableIdAliases = new Set([tableId, `grid#${tableId}`])
+    return Array.from(tableElement.querySelectorAll('[id]')).some((candidate) => {
+        const coordinates = getGridCoordinatesFromId(candidate.id)
+        return coordinates !== undefined && tableIdAliases.has(coordinates.tableId)
+    })
 }
 
 const getCoordinatesForElement = (element: Element): TableCoordinates | undefined => {
@@ -574,8 +1012,14 @@ const getCoordinatesForElement = (element: Element): TableCoordinates | undefine
     }
 }
 
-const getCellId = (tableId: string, row: number, column: number) =>
-    tableId.includes('#') ? `${tableId}#${row},${column}` : `${tableId}[${row},${column}]`
+const getCellId = (tableId: string, row: number, column: number) => {
+    if (tableId.startsWith('tree#')) {
+        return row === 0
+            ? `${tableId}#HierarchyHeader#${column}#header`
+            : `${tableId}#${row}#${column}`
+    }
+    return tableId.includes('#') ? `${tableId}#${row},${column}` : `${tableId}[${row},${column}]`
+}
 
 const getCurrentHeaderText = (headerCell: Element | null) => {
     if (headerCell === null) {
@@ -597,7 +1041,7 @@ const getTextFromIdList = (document: Document, idList: string | null) =>
     normalizeText(idList)
         .split(/\s+/u)
         .filter((id) => id !== '')
-        .map((id) => normalizeText(document.getElementById(id)?.textContent))
+        .map((id) => normalizeLabelText(document.getElementById(id)?.textContent))
         .filter((text) => text !== '')
 
 const getElementLabelFromAttributes = (document: Document, element: Element | null) => {
@@ -605,7 +1049,7 @@ const getElementLabelFromAttributes = (document: Document, element: Element | nu
         return undefined
     }
 
-    const ariaLabel = normalizeText(element.getAttribute('aria-label'))
+    const ariaLabel = normalizeLabelText(element.getAttribute('aria-label'))
     if (ariaLabel !== '') {
         return ariaLabel
     }
@@ -615,7 +1059,7 @@ const getElementLabelFromAttributes = (document: Document, element: Element | nu
         return ariaLabelledByText.join(' / ')
     }
 
-    const title = normalizeText(element.getAttribute('title'))
+    const title = normalizeLabelText(element.getAttribute('title'))
     if (title !== '') {
         return title
     }
@@ -652,13 +1096,14 @@ const getTableHeadingText = (tableElement: Element) => {
         '[role="heading"]',
     ]
     for (const selector of headingSelectors) {
-        const headingElement = tableElement.querySelector(selector)
-        if (headingElement === null) {
-            continue
-        }
-        const headingText = normalizeText(headingElement.textContent)
-        if (headingText !== '') {
-            return headingText
+        const headingElements = Array.from(tableElement.querySelectorAll(selector)).filter(
+            (headingElement) => headingElement.closest('table') === tableElement,
+        )
+        for (const headingElement of headingElements) {
+            const headingText = normalizeText(headingElement.textContent)
+            if (headingText !== '') {
+                return headingText
+            }
         }
     }
     return undefined
@@ -702,12 +1147,7 @@ const getLabelFromSibling = (document: Document, element: Element | null) => {
         return explicitLabel
     }
 
-    const siblingText = normalizeText(element.textContent)
-    if (siblingText !== '' && siblingText.length <= 120) {
-        return siblingText
-    }
-
-    return undefined
+    return getElementTextLabel(element)
 }
 
 const getNearestTableLabel = (document: Document, element: Element) => {
@@ -728,21 +1168,41 @@ const getNearestTableLabel = (document: Document, element: Element) => {
     return undefined
 }
 
-const getTableTitle = (document: Document, tableId: string) => {
-    const titleElement =
-        document.getElementById(`${tableId}-title`) ?? document.getElementById(`${tableId}#title`)
-    if (titleElement !== null) {
-        const titleText = normalizeText(titleElement.textContent)
-        if (titleText !== '') {
-            return titleText
+const getAncestorTableLabel = (document: Document, element: Element) => {
+    let currentElement: Element | null = element.parentElement
+    while (currentElement !== null) {
+        const ownLabel = getOwnTableLabel(document, currentElement)
+        if (ownLabel !== undefined) {
+            return ownLabel
         }
+        currentElement = currentElement.parentElement
+    }
+    return undefined
+}
+
+const getTableTitle = (document: Document, tableId: string) => {
+    const tableIdCandidates = [tableId]
+    if (tableId.startsWith('grid#')) {
+        tableIdCandidates.push(tableId.slice('grid#'.length))
     }
 
-    const tableElement = document.getElementById(tableId)
-    if (tableElement !== null) {
-        const tableLabel = getNearestTableLabel(document, tableElement)
-        if (tableLabel !== undefined) {
-            return tableLabel
+    for (const tableIdCandidate of tableIdCandidates) {
+        const titleElement =
+            document.getElementById(`${tableIdCandidate}-title`) ??
+            document.getElementById(`${tableIdCandidate}#title`)
+        if (titleElement !== null) {
+            const titleText = normalizeText(titleElement.textContent)
+            if (titleText !== '') {
+                return titleText
+            }
+        }
+
+        const tableElement = document.getElementById(tableIdCandidate)
+        if (tableElement !== null) {
+            const tableLabel = getNearestTableLabel(document, tableElement)
+            if (tableLabel !== undefined) {
+                return tableLabel
+            }
         }
     }
 
@@ -779,6 +1239,116 @@ const getTableContext = (document: Document, element: Element): TableContext => 
         tableLabel: tableTitle,
         composedLabel: labelParts.length === 0 ? undefined : labelParts.join(' / '),
     }
+}
+
+const addUniqueValue = (
+    values: string[],
+    seenValues: Set<string>,
+    value: string | undefined,
+    maximumLength = 240,
+) => {
+    const normalized = toCompactLabel(value, maximumLength)
+    if (normalized === undefined) {
+        return
+    }
+    const key = normalizeForMatch(normalized)
+    if (seenValues.has(key)) {
+        return
+    }
+    seenValues.add(key)
+    values.push(normalized)
+}
+
+const getTableGridEntries = (tableElement: Element) => {
+    const tableId = normalizeText(tableElement.id)
+    if (tableId === '') {
+        return []
+    }
+    const tableIdAliases = new Set([tableId, `grid#${tableId}`])
+
+    const gridEntries: Array<{ element: Element; coordinates: TableCoordinates }> = []
+    tableElement.querySelectorAll('[id]').forEach((candidate) => {
+        const coordinates = getGridCoordinatesFromId(candidate.id)
+        if (coordinates === undefined || !tableIdAliases.has(coordinates.tableId)) {
+            return
+        }
+        gridEntries.push({
+            coordinates,
+            element: candidate,
+        })
+    })
+    return gridEntries
+}
+
+const getTableColumnHeaders = (tableElement: Element) => {
+    const headersByColumn = new Map<number, string>()
+    const gridEntries = getTableGridEntries(tableElement)
+    gridEntries
+        .filter((entry) => entry.coordinates.row === 0)
+        .forEach((entry) => {
+            if (headersByColumn.has(entry.coordinates.column)) {
+                return
+            }
+            const headerText =
+                getCurrentHeaderText(entry.element) ??
+                toCompactLabel(entry.element.getAttribute('title'), 200) ??
+                toCompactLabel(entry.element.textContent, 200)
+            if (headerText !== undefined) {
+                headersByColumn.set(entry.coordinates.column, headerText)
+            }
+        })
+
+    const sortedHeaders = [...headersByColumn.entries()]
+        .sort(([leftColumn], [rightColumn]) => leftColumn - rightColumn)
+        .map(([, text]) => text)
+
+    if (sortedHeaders.length > 0) {
+        return sortedHeaders
+    }
+
+    const fallbackHeaders: string[] = []
+    const seenHeaders = new Set<string>()
+    tableElement.querySelectorAll('[role="columnheader"],th').forEach((headerElement) => {
+        addUniqueValue(
+            fallbackHeaders,
+            seenHeaders,
+            getCurrentHeaderText(headerElement) ??
+                toCompactLabel(headerElement.getAttribute('title'), 200) ??
+                toCompactLabel(headerElement.textContent, 200),
+            200,
+        )
+    })
+    return fallbackHeaders
+}
+
+const getTableCellValues = (tableElement: Element) => {
+    const values: string[] = []
+    const seenValues = new Set<string>()
+
+    const gridEntries = getTableGridEntries(tableElement)
+    gridEntries
+        .filter((entry) => entry.coordinates.row > 0)
+        .forEach((entry) => {
+            addUniqueValue(values, seenValues, entry.element.getAttribute('title') ?? undefined)
+            addUniqueValue(values, seenValues, getElementValue(entry.element))
+            entry.element
+                .querySelectorAll('input,textarea,select')
+                .forEach((field) => addUniqueValue(values, seenValues, getElementValue(field)))
+        })
+
+    if (values.length > 0) {
+        return values
+    }
+
+    tableElement.querySelectorAll('[role="gridcell"],td,[ct="SC"],[ct="STC"],[ct="HIC"]').forEach((cellElement) => {
+        addUniqueValue(values, seenValues, cellElement.getAttribute('title') ?? undefined)
+        addUniqueValue(values, seenValues, getElementValue(cellElement))
+        cellElement
+            .querySelectorAll('input,textarea,select')
+            .forEach((field) => addUniqueValue(values, seenValues, getElementValue(field)))
+    })
+
+    return values
 }
 
 const isToRangeLabel = (label: string | undefined) =>
@@ -849,9 +1419,19 @@ const createElementMetadata = (root: Element | Document) => {
     const metadata = getCandidateElements(root).map((element) => {
         const id = normalizeText(element.id) || undefined
         const title = normalizeText(element.getAttribute('title')) || undefined
-        const ariaLabel = normalizeText(element.getAttribute('aria-label')) || undefined
+        const ariaLabel = normalizeLabelText(element.getAttribute('aria-label')) || undefined
+        const ct = element.getAttribute('ct') ?? element.getAttribute('subct') ?? undefined
+        const role = element.getAttribute('role') ?? undefined
+        const controlTypes = inferControlTypes(element, ct, role)
+        const labelCandidates = getLabelCandidatesForElement(document, element, controlTypes, title)
+        const tabLabels = controlTypes.has('tabstrip') ? getTabStripLabels(element) : []
         const tableContext = getTableContext(document, element)
-        const ownTableLabel = getOwnTableLabel(document, element)
+        const ownTableLabel = controlTypes.has('table')
+            ? getOwnTableLabel(document, element) ??
+              (ct !== undefined ? getAncestorTableLabel(document, element) : undefined)
+            : undefined
+        const tableColumnHeaders = controlTypes.has('table') ? getTableColumnHeaders(element) : []
+        const tableCellValues = controlTypes.has('table') ? getTableCellValues(element) : []
         if (ownTableLabel !== undefined && tableContext.tableLabel === undefined) {
             tableContext.tableLabel = ownTableLabel
         }
@@ -861,14 +1441,19 @@ const createElementMetadata = (root: Element | Document) => {
         return {
             ariaLabel,
             checked: getElementCheckedState(element),
-            ct: element.getAttribute('ct') ?? undefined,
-            directLabel: getPrimaryLabelForElement(document, id),
+            controlTypes,
+            ct,
+            directLabel: labelCandidates[0],
             displayLabel: '',
             element,
             groupLabel: undefined,
             id,
+            labelCandidates,
             rangePart: undefined,
-            role: element.getAttribute('role') ?? undefined,
+            role,
+            tabLabels,
+            tableCellValues,
+            tableColumnHeaders,
             rowKey: element.closest('tr')?.id ?? undefined,
             tableContext,
             title,
@@ -888,11 +1473,16 @@ const matchesText = (actual: string | undefined, expected: string | undefined) =
 const matchesTextExactly = (actual: string | undefined, expected: string | undefined) =>
     expected === undefined || normalizeForMatch(actual) === normalizeForMatch(expected)
 
+const matchesAnyText = (actualValues: string[], expected: string | undefined) =>
+    expected === undefined || actualValues.some((actualValue) => matchesText(actualValue, expected))
+
 const matchesLabel = (item: ElementMetadata, label: string | undefined, exactMatch: boolean) => {
     if (label === undefined) {
         return true
     }
     return [
+        ...item.labelCandidates,
+        ...item.tabLabels,
         item.displayLabel,
         item.directLabel,
         item.groupLabel,
@@ -909,81 +1499,14 @@ const matchesControlType = (item: ElementMetadata, controlType: WebGuiControlTyp
         return true
     }
 
-    const controlTypes = new Set<WebGuiControlType>()
-    const normalizedRole = normalizeForMatch(item.role)
-    if (supportedControlTypes.has(normalizedRole)) {
-        controlTypes.add(normalizedRole as WebGuiControlType)
-    }
-
-    if (item.ct === 'B' || item.ct === 'IMG') {
-        controlTypes.add('button')
-    }
-    if (item.ct === 'CB' || item.ct === 'CBS') {
-        controlTypes.add('checkbox')
-    }
-    if (item.ct === 'CI') {
-        controlTypes.add('textbox')
-    }
-    if (item.ct === 'LN' || item.ct === 'LNC') {
-        controlTypes.add('link')
-    }
-    if (item.ct === 'R' || item.ct === 'R_standards' || item.ct === 'RLI') {
-        controlTypes.add('radio')
-    }
-    if (item.ct === 'TV') {
-        controlTypes.add('listbox')
-    }
-    if (item.ct === 'G' || item.ct === 'STCS') {
-        controlTypes.add('table')
-    }
-
-    if (item.element instanceof HTMLButtonElement) {
-        controlTypes.add('button')
-    }
-    if (item.element instanceof HTMLTextAreaElement) {
-        controlTypes.add('textbox')
-    }
-    if (item.element instanceof HTMLSelectElement) {
-        if (item.element.multiple || item.element.size > 1) {
-            controlTypes.add('listbox')
-        } else {
-            controlTypes.add('combobox')
-        }
-    }
-    if (item.element instanceof HTMLInputElement) {
-        const normalizedType = normalizeForMatch(item.element.type)
-        if (normalizedType === 'checkbox') {
-            controlTypes.add('checkbox')
-        } else if (normalizedType === 'radio') {
-            controlTypes.add('radio')
-        } else if (
-            normalizedType === 'button' ||
-            normalizedType === 'image' ||
-            normalizedType === 'reset' ||
-            normalizedType === 'submit'
-        ) {
-            controlTypes.add('button')
-        } else {
-            controlTypes.add('textbox')
-        }
-    }
-    if (item.element instanceof HTMLAnchorElement) {
-        controlTypes.add('link')
-    }
-    if (item.element instanceof HTMLTableElement) {
-        controlTypes.add('table')
-    }
-    if (normalizeForMatch(item.role) === 'table' || normalizeForMatch(item.role) === 'grid') {
-        controlTypes.add('table')
-    }
-
-    return controlTypes.has(controlType)
+    return item.controlTypes.has(controlType)
 }
 
 const filterBySelector = (root: Element | Document, selector: string): Element[] => {
     const criteria = parseSelector(selector)
     const matchedElements = createElementMetadata(root)
         .filter((item) => {
+            const isTableControl = item.controlTypes.has('table')
             if (!matchesControlType(item, criteria.controlType)) {
                 return false
             }
@@ -1005,19 +1528,45 @@ const filterBySelector = (root: Element | Document, selector: string): Element[]
             if (!matchesText(item.tableContext.tableLabel, criteria.table)) {
                 return false
             }
+            if (!matchesAnyText(item.tabLabels, criteria.tab)) {
+                return false
+            }
             if (!matchesText(item.tableContext.rowLabel, criteria.row)) {
                 return false
             }
-            if (!matchesText(item.tableContext.columnLabel, criteria.column)) {
-                return false
+            if (criteria.column !== undefined) {
+                if (isTableControl) {
+                    if (!matchesAnyText(item.tableColumnHeaders, criteria.column)) {
+                        return false
+                    }
+                } else if (!matchesText(item.tableContext.columnLabel, criteria.column)) {
+                    return false
+                }
+            }
+            if (criteria.cell !== undefined) {
+                if (!isTableControl || !matchesAnyText(item.tableCellValues, criteria.cell)) {
+                    return false
+                }
             }
             if (!matchesText(item.title, criteria.title)) {
                 return false
             }
-            if (!matchesText(item.value, criteria.value)) {
-                return false
+            if (criteria.value !== undefined) {
+                if (isTableControl) {
+                    if (!matchesAnyText(item.tableCellValues, criteria.value)) {
+                        return false
+                    }
+                } else if (!matchesText(item.value, criteria.value)) {
+                    return false
+                }
             }
-            if (!matchesLabel(item, criteria.label, criteria.controlType === 'table')) {
+            if (
+                !matchesLabel(
+                    item,
+                    criteria.label,
+                    criteria.controlType === 'table' || criteria.controlType === 'tabstrip',
+                )
+            ) {
                 return false
             }
             return true

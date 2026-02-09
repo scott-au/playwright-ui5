@@ -155,8 +155,8 @@ test.beforeAll(async () => {
 test('webgui example', async ({ page }) => {
     await page.goto('file:///path/to/webgui-page.html')
     await page.fill("webgui=textbox[label='Breed search']", 'Labrador Retriever')
-    await page.fill("webgui=textbox[group='Ranking'][part='from']", '1')
-    await page.fill("webgui=textbox[group='Ranking'][part='to']", '10')
+    await page.fill("webgui=textbox[group='Popularity Rank'][part='from']", '1')
+    await page.fill("webgui=textbox[group='Popularity Rank'][part='to']", '10')
 })
 ```
 
@@ -165,16 +165,73 @@ test('webgui example', async ({ page }) => {
 the webgui selector engine focuses on user-facing selectors and table fallbacks:
 
 -   css-like syntax: `webgui=<type>[key='value'][key='value']...`
--   supported types: `textbox`, `button`, `checkbox`, `radio`, `combobox`, `listbox`, `option`, `spinbutton`, `table`, `link`, `*`
+-   supported types: `abaplist`, `abaplistelement`, `box`, `button`, `cell`, `checkbox`, `column`, `combobox`, `expandablesection`, `link`, `listbox`, `messagearea`, `messagebar`, `modalwindow`, `option`, `radio`, `spinbutton`, `table`, `tab`, `tabstrip`, `text`, `textbox`, `*`
+-   constructor-style aliases supported: `webguielement`, `dropdownbutton`, `textfield`, `datefield`, `dropdownfield`, `radiogroup`, `tree`, `modal`, `statictext`, `section`, `rangefields`, `textrangefields`, `daterangefields`, `numberrangefields`, `abaplisttree`, `abaplisttable`
 -   supported keys:
     -   `label`: matches controls by visible label text
-    -   `group`: matches range groups (for example `Ranking` + `to`)
+    -   `group`: matches range groups (for example `Popularity Rank` + `to`)
     -   `part=from|to`: selects one side of a range group
     -   `table`, `row`, `column`: fallback for unlabeled table controls
+    -   `tab`: matches tab labels inside `tabstrip` controls (for example `webgui=tabstrip[tab='Breed Details']`)
+    -   menu entries with role `menuitem`/`menuitemradio` are matched as `option` controls
+    -   for `table` selectors, `column` matches table column headers (for example `webgui=table[column='Breed Name']`)
+    -   for `table` selectors, `cell` and `value` match any visible cell value (for example `webgui=table[cell='Labrador Retriever']`)
+    -   tree-style table ids (`tree#...#row#column`) also support `column`/`cell` matching via `table` or `tree`
+    -   role-based grid tables without coordinate ids still support `column`/`cell` matching
     -   `id`: final fallback when no visible label exists
     -   `title` and `role`: optional extra filters
     -   `value` and `checked=true|false`: value/state filters for lists, radios, checkboxes, and inputs
     -   `index=<n>`: 1-based index when multiple elements match
+
+#### selector examples
+
+```ts
+test('webgui selector examples', async ({ page }) => {
+    await page.goto('file:///path/to/webgui-page.html')
+
+    // visible labels
+    await page.fill("webgui=textbox[label='Dog ID']", 'DOG-10000001')
+    await page.click("webgui=button[label='Fetch Dog Record']")
+    await page.click("webgui=link[label='Open Breed Profile']")
+    await page.fill("webgui=textfield[label='Dog ID']", 'DOG-10000002') // class alias
+    await page.selectOption("webgui=dropdownfield[label='Kennel Country']", 'AU') // class alias
+
+    // range groups
+    await page.fill("webgui=textbox[group='Puppy Age (Months)'][part='from']", '1')
+    await page.fill("webgui=textbox[group='Puppy Age (Months)'][part='to']", '12')
+
+    // table selector by visual label
+    const breedOptionTable = page.locator(
+        "webgui=table[label='Select the desired rescue dog option']",
+    )
+    await expect(breedOptionTable).toBeVisible()
+    await expect(page.locator("webgui=tree[column='Breed Name']")).toBeVisible() // class alias
+
+    // table selector by column header
+    const breedTable = page.locator("webgui=table[column='Breed Name']")
+    await expect(breedTable).toBeVisible()
+
+    // table selector by visible cell text/value
+    await expect(page.locator("webgui=table[cell='Labrador Retriever']")).toBeVisible()
+    await expect(page.locator("webgui=table[value='LABRADOR_RETRIEVER']")).toBeVisible()
+    await expect(page.locator("webgui=table[column='Pup Name']")).toBeVisible() // tree-style table header
+    await expect(page.locator("webgui=tree[cell='Labrador']")).toBeVisible() // tree alias
+    await expect(page.locator("webgui=table[column='Dog Code']")).toBeVisible() // role-based grid header
+
+    // fallback: field inside a table by table/row/column
+    await page.fill("webgui=textbox[table='Dog Orders'][row='Labrador'][column='Treat Qty']", '12')
+
+    // tab strip + modal/message controls
+    await expect(page.locator("webgui=tabstrip[tab='Breed & Temperament']")).toBeVisible()
+    await expect(page.locator("webgui=modalwindow[label='Confirm Dog Profile Save']")).toBeVisible()
+    await expect(page.locator("webgui=messagebar[value='Dog profile saved']")).toBeVisible()
+    await expect(page.locator("webgui=expandablesection[label='Advanced Dog Options']")).toBeVisible()
+
+    // disambiguation with index and id fallback
+    await page.click("webgui=button[label='Save Dog Profile'][index=1]")
+    await page.fill("webgui=textbox[id='favorite-toy']", 'Squeaky Tennis Ball')
+})
+```
 
 #### table iteration example
 
