@@ -114,6 +114,20 @@ button {
     align-items: start;
 }
 
+.selectorRow--table-context {
+    border-left: 3px solid #0a84ff;
+    border-radius: 4px;
+    padding: 4px 6px;
+    background: #eff6ff;
+}
+
+.selectorRow--chain {
+    border-left: 3px solid #0f9d58;
+    border-radius: 4px;
+    padding: 4px 6px;
+    background: #f0fdf4;
+}
+
 .selectorContent {
     display: grid;
     gap: 4px;

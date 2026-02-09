@@ -28,6 +28,10 @@ const createSelectorRow = (selector) => {
 
     const selectorValue = normalizeText(selector?.value)
     const selectorLabel = normalizeText(selector?.label)
+    const selectorKind = normalizeText(selector?.kind)
+    if (selectorKind !== '') {
+        row.classList.add(`selectorRow--${selectorKind}`)
+    }
 
     const content = document.createElement('div')
     content.className = 'selectorContent'
